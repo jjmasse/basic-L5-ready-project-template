@@ -14,7 +14,7 @@ the alignment handshake on judgment work, and (3) whatever
 
 | Surface | Role | Owner |
 | --- | --- | --- |
-| **GitHub Project board** | The queue: what work exists, what state it is in, what order it runs | Owner creates items; agents move them (except the one human gate below) |
+| **GitHub Project board** (owner `{{GITHUB_OWNER}}`) | The queue: what work exists, what state it is in, what order it runs | Owner creates items; agents move them (except the one human gate below) |
 | **GitHub Issues** | One unit of work each; the shaping conversation and the preparation block live in comments | Shared |
 | **`planning/`** | Design content — briefs, specs, formulas. Issues *link* to these; they do not replace them | Owner |
 | **`planning/WORK-*.md`** | Execution tracker for one effort, linked from the issue | Agent |
