@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git fetch:*)",
+      "PowerShell(git fetch:*)",
+      "Bash(git status:*)",
+      "PowerShell(git status:*)",
+      "Bash(git log:*)",
+      "PowerShell(git log:*)",
+      "Bash(git diff:*)",
+      "PowerShell(git diff:*)",
+      "Bash(gh pr view:*)",
+      "PowerShell(gh pr view:*)",
+      "Bash(gh pr checks:*)",
+      "PowerShell(gh pr checks:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/block-git-stash.mjs"
+          }
+        ]
+      }
+    ]
+  }
+}

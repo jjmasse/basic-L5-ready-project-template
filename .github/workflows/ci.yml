@@ -1,0 +1,56 @@
+# The deploy gate. If the deploy platform waits for CI, only commits where
+# this workflow is green ever ship. One job, `verify`, runs the same full
+# local gate every agent runs before declaring work done (CLAUDE.md, "what
+# done means"), so CI is the backstop and never the first line.
+#
+# Branch protection on `main` should require the `verify` check (this job)
+# and the `review-record` commit status (posted by review-record.yml).
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # The template repository itself has nothing to verify. Every repository
+    # created from it runs the job.
+    if: ${{ !github.event.repository.is_template }}
+
+    # TEMPLATE: add services the tests need (a database, a cache), and the
+    # matching env vars. Example for Postgres:
+    #
+    # services:
+    #   postgres:
+    #     image: postgres:16-alpine
+    #     env: { POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres, POSTGRES_DB: app_test }
+    #     ports: ['5432:5432']
+    #     options: >-
+    #       --health-cmd "pg_isready -U postgres" --health-interval 5s
+    #       --health-timeout 5s --health-retries 10
+    # env:
+    #   DATABASE_URL: postgresql://postgres:postgres@localhost:5432/app_test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Fails while any placeholder token from the template is still in the
+      # tree. Delete this step along with scripts/init-template.mjs once the
+      # checklist is done.
+      - name: Refuse unfilled template placeholders
+        if: ${{ hashFiles('scripts/init-template.mjs') != '' }}
+        run: node scripts/init-template.mjs --check
+
+      # TEMPLATE: toolchain setup for your stack (setup-node + pnpm, setup-python,
+      # setup-go, ...) and dependency install with a frozen lockfile.
+
+      - name: Verify (the full local gate)
+        run: |
+          {{VERIFY_COMMAND}}

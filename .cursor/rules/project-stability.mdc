@@ -1,0 +1,89 @@
+---
+description: {{PROJECT_NAME}} engineering contract — one authoritative core, transactional writes, config-as-data, and the definition of done. Mirrors CLAUDE.md; binding for every change.
+alwaysApply: true
+---
+
+# {{PROJECT_NAME}} engineering contract (binding)
+
+This rule mirrors the project contract in `CLAUDE.md`. It is inlined here so it
+applies even in environments (e.g. cloud agents) that don't read `CLAUDE.md`.
+Where the two disagree, `CLAUDE.md` wins — flag the drift.
+
+## Golden rules (never violate)
+
+1. **One authoritative core.** Clients render state and *request* actions.
+   They never compute outcomes, never decide what is legal, never trust their
+   own numbers. Every action is validated where the truth lives.
+2. **No lost or duplicated writes.** Any state-changing action runs in a single
+   transaction with row locking, re-validates inside it, and is audit-logged.
+   Concurrent double-submit is a P0 at all times.
+3. **Tunables are data, not code.** Every rate, cost, limit, and timer lives in
+   versioned config. No magic numbers inline.
+4. <!-- TEMPLATE: product-specific rule, mirrored from CLAUDE.md -->
+5. <!-- TEMPLATE: product-specific rule, mirrored from CLAUDE.md -->
+
+## Architecture & stack (LOCKED — do not restructure)
+
+{{STACK_SUMMARY}}
+
+## Conventions (every change)
+
+- Strict types. No escape hatches without a comment justifying each one.
+- Pure domain logic is side-effect-free and lives apart from IO, so the core is
+  testable without infrastructure.
+- Integer math for balances — never floats.
+- Mutating operations follow this exact shape:
+  `authenticate → validate → rate-limit → begin tx → lock row → re-validate →
+  mutate → audit-log → commit`.
+- Every mutating action writes an audit row inside the same transaction.
+- Anything random uses a **stored seed** so outcomes are reproducible.
+- **Migrations are additive-only** (rollback is redeploying the previous
+  image, not down-migrations). A hand-written migration must also be
+  registered wherever the migration runner looks — an unregistered migration
+  silently never runs.
+
+## Definition of done (a feature is not done without all of these)
+
+- Validated at the boundary, transactional, rate-limited where exposed,
+  audit-logged.
+- Pure logic unit-tested: happy path **plus at least one exploit/edge case**.
+- Tunable values pulled from config, not hardcoded.
+- Reflected in the client read-only first, then wired to the action.
+- The full local gate passes before the work is declared finished:
+  `{{VERIFY_COMMAND}}`.
+
+## Non-negotiable regression tests (keep them passing, add in this spirit)
+
+- Two concurrent requests from the same account cannot both succeed against the
+  same balance.
+- <!-- TEMPLATE: invariant, mirrored from CLAUDE.md -->
+
+## Local dev ports on the product owner's machine (multi-session convention)
+
+Parallel agent sessions share one machine and one dev database.
+
+- **Ports {{OWNER_PORTS}} are reserved for the product owner's local**,
+  serving current `main`. Never take these ports, kill their processes, or
+  leave them serving branch code.
+- **Feature/QA sessions use alternate ports**, set in that worktree's root
+  `.env`.
+- **Test runs use an isolated database — dev servers stay up.** The suite runs
+  against `TEST_DATABASE_URL` (root `.env`). Don't run two sessions' full
+  suites simultaneously against the same test database.
+- **If the reserved pair is down or serving branch code, restore it.**
+
+Only applies on the shared local machine — CI and cloud agent VMs ignore it.
+
+## Planning docs discipline
+
+- All planning/design/status/spec documents live in the `planning/` directory
+  (tracked in git). **Never create planning or status docs at the repo root**
+  or anywhere else in the tree.
+- Planning docs are product-owner input: treat them as read-mostly. Edit one
+  only when explicitly asked; never move or delete anything under `planning/`
+  without being asked.
+- The one exception is `planning/WORK-<slug>.md`, a coding agent's own
+  execution tracker for a single effort (written by the `/dev-loop` skill).
+  `WORK-*` files are agent-owned; every other prefix is product-owner-owned.
+- When orienting on a task, consult `planning/BUILD-SPEC.md` and
+  `planning/BACKLOG.md`.

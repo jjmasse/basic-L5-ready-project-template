@@ -1,0 +1,114 @@
+# The gate that makes "every PR is reviewed before it merges" true rather than
+# merely stated.
+#
+# WHAT IT CHECKS, precisely: that a comment on this PR carries a hidden marker
+# naming the CURRENT head commit. It does not read the diff and it does not
+# judge code — it asks "did a review of *this exact commit* happen and get
+# written down?" The review itself is the local /code-review skill, run
+# in-session by /review-and-ship (see .github/MERGE-POLICY.md, criterion 2).
+#
+# WHY A COMMIT STATUS AND NOT A JOB RESULT: the record usually appears AFTER
+# the push that triggered CI — review, then post. A job's own conclusion is
+# frozen at the moment it ran, so it could never go green later without a
+# rerun. Instead this posts a commit status against the head sha, and it
+# re-runs on comment events, so posting the record flips the status green on
+# its own. That transition is the gate working as designed, NOT a flaky check
+# under MERGE-POLICY criterion 6 — the carve-out there names this check.
+#
+# WHAT IT CANNOT DO: the session that proposes the merge is usually the session
+# that posts the record, so this enforces attestation, not independent review.
+# It closes stale reviews (the marker is bound to the head sha, so a new push
+# invalidates it), hand-merges with no review at all, and PRs from authors that
+# no agent session ever touched. It does not stop a reviewer from lying.
+#
+# FAILS CLOSED: if this workflow errors, no status is posted, the required
+# check stays pending, and the PR does not merge.
+name: Review record
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  issue_comment:
+    types: [created, edited, deleted]
+
+permissions:
+  contents: read
+  pull-requests: read
+  # PR conversation comments are served by the ISSUES endpoint
+  # (/repos/{repo}/issues/{n}/comments), so grant issues:read too. Without it
+  # the read can 403, `set -e` aborts before any status is posted, and the
+  # required check stays pending forever — which blocks every PR.
+  issues: read
+  statuses: write
+
+concurrency:
+  group: review-record-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  # NOTE FOR BRANCH PROTECTION: require the context `review-record` — the
+  # commit status this job POSTS. Do NOT require this job's own check, which is
+  # named `review-record-job` and passes whenever the job runs successfully,
+  # regardless of the verdict. Requiring the job instead of the status would
+  # look configured while enforcing nothing.
+  review-record-job:
+    # issue_comment fires for plain issues too; only PRs have .pull_request.
+    if: github.event_name == 'pull_request' || github.event.issue.pull_request
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR: ${{ github.event.pull_request.number || github.event.issue.number }}
+      MARKER_PREFIX: "{{PROJECT_SLUG}}-review-record"
+    steps:
+      - name: Evaluate the review record and post the commit status
+        run: |
+          set -euo pipefail
+
+          # Always resolve the head sha from the API rather than from the event
+          # payload: an issue_comment payload has no head sha at all, and a
+          # pull_request payload can be a commit behind by the time this runs.
+          SHA="$(gh pr view "$PR" --repo "$REPO" --json headRefOid --jq .headRefOid)"
+          if [ -z "$SHA" ]; then
+            echo "::error::Could not resolve a head sha for PR #$PR — refusing to post a status."
+            exit 1
+          fi
+          SHORT="${SHA:0:7}"
+          echo "PR #$PR head is $SHA"
+
+          # ONE marker counts: "<prefix>: <sha>", written by /review-and-ship
+          # after its final clean local /code-review pass. Do not widen this to
+          # accept weaker markers (an inline pass, a bot verdict): the policy
+          # says those inform a human and never satisfy the gate.
+          BODIES="$(gh api "repos/$REPO/issues/$PR/comments" --paginate --jq '.[].body')"
+
+          # Deliberately a bash substring test, NOT `printf ... | grep -q`.
+          # Under `set -o pipefail` that pipeline reports failure even when
+          # grep MATCHES: grep -q exits the moment it finds the marker, printf
+          # is still writing if the bodies exceed the 64KB pipe buffer, printf
+          # dies of SIGPIPE (141), and pipefail makes 141 the pipeline's
+          # status. The success branch would then be unreachable on exactly
+          # the PRs with the most comment traffic, and no rerun would fix it.
+          if [[ "$BODIES" == *"$MARKER_PREFIX: $SHA"* ]]; then
+            STATE=success
+            DESC="Reviewed at $SHORT"
+          else
+            STATE=failure
+            DESC="No review record for $SHORT — run /review-and-ship, or post one by hand (see MERGE-POLICY.md)"
+          fi
+
+          # GitHub truncates descriptions past 140 characters.
+          DESC="${DESC:0:140}"
+          echo "$STATE — $DESC"
+
+          gh api -X POST "repos/$REPO/statuses/$SHA" \
+            -f state="$STATE" \
+            -f context=review-record \
+            -f description="$DESC" \
+            -f target_url="https://github.com/$REPO/blob/main/.github/MERGE-POLICY.md#merge-criteria-all-tiers-before-any-auto-merge-in-assisted-modes" \
+            >/dev/null
+
+          if [ "$STATE" != success ]; then
+            echo "::notice::PR #$PR has no review record for $SHORT. This is not a build failure — review the PR and post the record."
+          fi

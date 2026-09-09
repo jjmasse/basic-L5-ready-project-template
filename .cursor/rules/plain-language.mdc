@@ -1,0 +1,44 @@
+---
+description: Plain language in all developer-facing writing; risk findings must include the concrete failure scenario, impact, and confidence.
+alwaysApply: true
+---
+
+# Plain language, explained risks
+
+Mirrors the "Language & explanations" section of `CLAUDE.md`. Applies to
+everything an agent writes in this project.
+
+## Plain language everywhere developer-facing
+
+Docs, code comments, commit messages, PR descriptions and comments, review
+findings, and chat/status updates use simple, direct sentences.
+
+- No metaphor, no flourish.
+- Define any jargon or project-specific term the first time it appears in a
+  given document or reply.
+- Short sentences beat clever ones. If a simpler word works, use it.
+
+<!-- TEMPLATE: if the product has a voice of its own (in-app copy, brand,
+     lore), name the one place it applies and the file that defines it. If
+     not, delete this comment. -->
+
+## Risk and bug reports must be judgeable by a non-author
+
+Most code here is AI-written, so the person reading a warning usually did not
+write the code and cannot fill in the missing context. Never just name a
+pattern ("race condition", "possible double-spend", "TOCTOU") and move on.
+
+Every risk or bug finding — in a PR review, a status update, or chat — must
+include:
+
+1. **What is wrong**, in one plain sentence.
+2. **The concrete failure scenario** — who does what, and then what goes
+   wrong. ("A user sends two requests in the same second; both read the old
+   balance, so both succeed and the account is charged once for two actions.")
+3. **The impact** if it's left alone (what a user, attacker, or operator would
+   actually experience).
+4. **Confidence** — verified by reading the code, or suspected.
+5. **The fix or next step.**
+
+If you can't describe the concrete scenario, say so explicitly instead of
+implying certainty.

@@ -1,0 +1,30 @@
+# Enforce LF line endings for all text files. A checkout made before this
+# file existed can keep CRLF files that git still calls clean — run
+# `git ls-files --eol` before trusting a hash of the tree.
+* text=auto eol=lf
+
+# Explicitly declare common source file types
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.mjs text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.py text eol=lf
+*.sh text eol=lf
+
+# PowerShell 5.1 scripts: keep as-is, they must stay pure ASCII anyway.
+*.ps1 text eol=lf
+
+# Binary files (no line ending conversion)
+*.png binary
+*.jpg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.pdf binary

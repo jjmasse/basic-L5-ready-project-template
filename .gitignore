@@ -1,0 +1,33 @@
+# dependencies
+node_modules/
+.pnpm-store/
+.venv/
+__pycache__/
+
+# build output
+dist/
+build/
+*.tsbuildinfo
+
+# env — ignore every variant (.env, .env.local, .env.bak, .env.old, …) so a
+# hand-made copy of a real key can never be committed. The template is the one
+# exception and is tracked on purpose.
+.env*
+!.env.example
+
+# logs
+*.log
+
+# editor / os
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+Thumbs.db
+
+# Claude Code — personal overrides and worktrees (do NOT commit)
+**/.claude/settings.local.json
+**/.claude/worktrees/
+
+# test / coverage
+coverage/
