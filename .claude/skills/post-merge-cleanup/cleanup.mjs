@@ -101,8 +101,11 @@ function parseArgs(argv) {
     else if (flag === '--health-timeout-sec') out.healthTimeoutSec = wholeNumber('--health-timeout-sec', value());
     else throw new Error(`Unknown argument: ${arg}\n\n${USAGE}`);
   }
-  const { pr, healthUrl, healthTimeoutSec } = out;
+  const { pr, healthTimeoutSec } = out;
   if (pr === null) throw new Error(`--pr is required.\n\n${USAGE}`);
+  // `None` and `NONE` count too, as they did in the PowerShell version: the
+  // init script keeps the case of whatever the owner typed.
+  const healthUrl = out.healthUrl.toLowerCase() === 'none' ? 'none' : out.healthUrl;
 
   // Only the word `none` skips the deploy watch. An empty value (a missing
   // argument, or an unset shell variable) is an error, not a skip, because the
