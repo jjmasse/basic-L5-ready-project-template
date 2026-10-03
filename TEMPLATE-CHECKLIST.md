@@ -78,5 +78,5 @@ deleted once the real text is in place.
 ## 5. Finish
 
 - [ ] `node scripts/init-template.mjs --check` passes.
-- [ ] `grep -rn "TEMPLATE:" --exclude-dir=.git .` returns nothing.
+- [ ] `git grep -n "TEMPLATE:"` returns nothing (works in any shell).
 - [ ] Delete `scripts/init-template.mjs`, `templates/`, and this file. Commit.

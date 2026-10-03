@@ -32,6 +32,10 @@ contract files tell every agent what the project's rules are.
 
 ## Using it
 
+Works the same on macOS, Linux, and Windows. You need git and Node 20 or
+newer; the shipping skills also use the GitHub CLI (`gh`). Every script is
+plain Node, so there is nothing shell-specific to install.
+
 1. On GitHub, click **Use this template** (or clone and re-init). Clone the new repo.
 2. Run the init script and answer its questions:
 
