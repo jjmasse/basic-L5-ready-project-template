@@ -78,5 +78,7 @@ deleted once the real text is in place.
 ## 5. Finish
 
 - [ ] `node scripts/init-template.mjs --check` passes.
-- [ ] `git grep -n "TEMPLATE:"` returns nothing (works in any shell).
+- [ ] `git grep -n --untracked "TEMPLATE:" -- ":!TEMPLATE-CHECKLIST.md"`
+      returns nothing. It works in any shell, and it skips this file, which
+      names the marker itself.
 - [ ] Delete `scripts/init-template.mjs`, `templates/`, and this file. Commit.

@@ -61,6 +61,13 @@ function run(command, args, { stdout = 'pipe' } = {}) {
   return { ok: result.status === 0, out: result.stdout ?? '' };
 }
 
+/** @param {string} value */
+function isHttpUrl(value) {
+  if (!URL.canParse(value)) return false;
+  const { protocol } = new URL(value);
+  return protocol === 'http:' || protocol === 'https:';
+}
+
 /** @param {number} ms */
 function sleep(ms) {
   return new Promise((done) => {
@@ -94,13 +101,17 @@ function parseArgs(argv) {
     else if (flag === '--health-timeout-sec') out.healthTimeoutSec = wholeNumber('--health-timeout-sec', value());
     else throw new Error(`Unknown argument: ${arg}\n\n${USAGE}`);
   }
-  if (out.pr === null) throw new Error(`--pr is required.\n\n${USAGE}`);
+  const { pr, healthUrl, healthTimeoutSec } = out;
+  if (pr === null) throw new Error(`--pr is required.\n\n${USAGE}`);
 
-  // Fail now rather than after ten minutes of probes that could never work.
-  if (out.healthUrl !== 'none' && out.healthUrl !== '' && !URL.canParse(out.healthUrl)) {
-    throw new Error(`The health URL "${out.healthUrl}" is not a URL. Pass --health-url <url>, or --health-url none to skip the deploy watch.`);
+  // Only the word `none` skips the deploy watch. An empty value (a missing
+  // argument, or an unset shell variable) is an error, not a skip, because the
+  // health gate is mandatory after every merge that deploys. Checked now
+  // rather than after ten minutes of probes that could never work.
+  if (healthUrl !== 'none' && !isHttpUrl(healthUrl)) {
+    throw new Error(`The health URL "${healthUrl}" is not an http(s) URL. Pass --health-url <url>, or --health-url none to skip the deploy watch.`);
   }
-  return /** @type {{ pr: number, healthUrl: string, healthTimeoutSec: number }} */ (out);
+  return { pr, healthUrl, healthTimeoutSec };
 }
 
 /** @returns {Promise<number>} the exit code */
@@ -108,7 +119,7 @@ async function main() {
   const { pr, healthUrl, healthTimeoutSec } = parseArgs(process.argv.slice(2));
 
   // 1. The PR must actually be merged — never clean up an open branch.
-  const view = run('gh', ['pr', 'view', String(pr), '--json', 'state,mergedAt,mergeCommit,headRefName']);
+  const view = run('gh', ['pr', 'view', String(pr), '--json', 'state,mergedAt,mergeCommit,headRefName,headRefOid']);
   if (!view.ok) {
     console.log(`could not read PR #${pr} with gh (see its message above) — stopping. Nothing was deleted.`);
     return 1;
@@ -131,8 +142,15 @@ async function main() {
     return 1;
   }
   if (exists.out.trim() !== '') {
-    if (!run('git', ['push', 'origin', '--delete', branch], { stdout: 'inherit' }).ok) {
+    // Delete only if the branch still points at the PR's last commit. A plain
+    // `--delete` removes whatever is there: commits pushed after the merge, or,
+    // for a PR from a fork, an unrelated origin branch that has the same name.
+    // --force-with-lease forces nothing here; it adds that one condition, and
+    // git refuses the delete with "stale info" when it does not hold.
+    const lease = `--force-with-lease=refs/heads/${branch}:${info.headRefOid}`;
+    if (!run('git', ['push', 'origin', '--delete', lease, branch], { stdout: 'inherit' }).ok) {
       console.log(`could not delete origin/${branch} (see git's message above) — stopping.`);
+      console.log(`If git says "stale info", the branch has commits that are not in PR #${pr}, so it was left alone on purpose.`);
       return 1;
     }
     console.log(`deleted origin/${branch}`);
@@ -141,7 +159,7 @@ async function main() {
   }
 
   // 3. Poll production health until healthy.
-  if (healthUrl === 'none' || healthUrl === '') {
+  if (healthUrl === 'none') {
     console.log('no health URL configured: skipping the deploy watch.');
     console.log('cleanup complete: PR merged, branch deleted.');
     return 0;

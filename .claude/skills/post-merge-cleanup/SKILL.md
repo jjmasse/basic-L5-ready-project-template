@@ -24,12 +24,15 @@ node .claude/skills/post-merge-cleanup/cleanup.mjs --pr <number>
 What it does (idempotent — safe to re-run):
 
 - Refuses to touch anything unless the PR state is `MERGED`.
-- Deletes the PR's remote branch, or reports it already gone.
+- Deletes the PR's remote branch, or reports it already gone. It deletes only
+  if the branch still points at the PR's last commit, so commits pushed after
+  the merge are never deleted with it.
 - Polls the production health URL (`{{PROD_HEALTH_URL}}`; pass `--health-url`
-  to override, or `none` to skip) every 30 s (default 10 min budget,
-  `--health-timeout-sec` to change) until healthy: HTTP 200, and if the body
-  is JSON with an `ok` field, `ok` must be true. Exit 0 = all clear; exit 1 =
-  stop and alert the owner (rollback steps: `planning/RUNBOOK-release.md`).
+  to override, or `none` to skip — an empty value is an error, not a skip)
+  every 30 s (default 10 min budget, `--health-timeout-sec` to change) until
+  healthy: HTTP 200, and if the body is JSON with an `ok` field, `ok` must be
+  true. Exit 0 = all clear; exit 1 = stop and alert the owner (rollback steps:
+  `planning/RUNBOOK-release.md`).
 
 The health gate is mandatory after every merge that deploys. If the project's
 health endpoint reports more than `ok` (a lag figure, a heartbeat), extend the
@@ -54,10 +57,10 @@ means — a bare 200 hides a process that is up but not doing its job.
 
 ## Gotchas (all hit for real)
 
-- **Pass PR bodies and comments to `gh` with `--body-file`**, not an inline
-  `--body`. Windows PowerShell 5.1 mangles double quotes embedded in arguments
-  to native programs, even from here-strings, and a long multi-line body is
-  fragile to quote in any shell.
+- **From Windows PowerShell 5.1, pass PR bodies and comments to `gh` with
+  `--body-file`.** It mangles double quotes embedded in arguments to native
+  programs, even from here-strings. Bash, on any platform, handles the inline
+  `--body` that review-and-ship uses for the review record.
 - **`gh pr checks` exits non-zero while checks are pending** — a non-zero exit
   there is not a failure signal; read the check lines.
 
@@ -65,5 +68,14 @@ means — a bare 200 hides a process that is up but not doing its job.
 
 - Driver exits 1 with `PROD NOT HEALTHY` → do NOT merge anything further;
   alert the owner with the health output and `planning/RUNBOOK-release.md`.
+- Driver exits 1 with `could not read PR` → `gh` is not signed in
+  (`gh auth status`), the PR number is wrong, or this checkout's `origin` is
+  not on GitHub. Nothing was deleted; fix the cause and re-run.
+- Driver exits 1 with `could not delete origin/<branch>` and git says
+  `stale info` → the remote branch has commits that are not in the merged PR
+  (pushed after the merge, or, for a PR from a fork, an unrelated branch on
+  `origin` that has the same name).
+  It was left alone on purpose. Find out whose commits those are before
+  anything else; never force the delete.
 - Driver exits 1 with `state is 'OPEN'` → the PR isn't merged; you're in
   /review-and-ship territory, not here.

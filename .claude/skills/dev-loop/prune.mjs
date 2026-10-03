@@ -130,8 +130,7 @@ function getWorktrees() {
 /**
  * Delete a branch ref only if it still points where we verified it. Plain
  * `git branch -D` deletes by name, so a commit made between the merged check
- * and the delete would be discarded without ever being checked — and the
- * window here spans a worktree removal that can take minutes. update-ref's
+ * and the delete would be discarded without ever being checked. update-ref's
  * compare-and-delete form fails instead, which is the outcome we want.
  *
  * One thing update-ref does NOT do that `git branch -d` does: refuse to delete
@@ -213,7 +212,7 @@ function getIdleHours(worktreePath) {
  * node_modules nests past the 260-character limit, where Remove-Item and
  * `cmd rmdir` both failed with "cannot find the path specified" on files that
  * exist. robocopy is long-path aware: mirroring an empty directory over the
- * target empties it, and the remaining husk deletes normally. That was
+ * target empties it, and what is left then deletes normally. That was
  * verified the hard way on three orphaned worktrees.
  *
  * @param {string} target
@@ -398,13 +397,7 @@ function main() {
       console.log(`removed worktree ${w.path}`);
     }
     removed.push(w.path);
-
-    if (removeBranchRef(w.branch, w.head)) {
-      console.log(`  deleted local branch ${w.branch}`);
-      prunedBranches.push(w.branch);
-    } else {
-      console.log(`  local branch ${w.branch} left alone: it moved since it was checked as merged`);
-    }
+    // Its branch is deleted by the local-branch pass below, not here.
   }
   for (const line of kept) console.log(line);
 
@@ -415,10 +408,14 @@ function main() {
   // a session — a branch a session has checked out is attached to a worktree
   // and is skipped.
   //
-  // That skip is load-bearing, because update-ref will happily delete a ref that
-  // is checked out somewhere. So rebuild the attachment map from a FRESH
-  // listing: another session can create a worktree while this script runs, and
+  // That skip matters, because update-ref will happily delete a ref that is
+  // checked out somewhere. So rebuild the attachment map from a FRESH listing:
+  // another session can create or move a worktree while this script runs, and
   // the snapshot taken at the top would not know about it.
+  //
+  // This pass also deletes the branches of the worktrees removed above. Doing
+  // it here, and not right after each removal, sends every branch delete
+  // through this one fresh check.
   //
   // Refs are read by their full name and trimmed here, not with
   // %(refname:short): that form abbreviates to whatever is unambiguous, so a
@@ -439,7 +436,6 @@ function main() {
     const name = ref.replace(/^refs\/heads\//, '');
     if (name === 'main') continue;
     if (attached.has(name)) continue;
-    if (prunedBranches.includes(name)) continue;
 
     if (!git(['merge-base', '--is-ancestor', sha, 'origin/main']).ok) {
       console.log(`${name}  KEPT: not merged into origin/main`);
