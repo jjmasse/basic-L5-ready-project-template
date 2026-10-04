@@ -225,16 +225,16 @@ loop — no further merges — and alert the owner with the health output and
 ## 9. Prune the workspace
 
 ```bash
-powershell -File .claude/skills/dev-loop/prune.ps1
+node .claude/skills/dev-loop/prune.mjs
 ```
 
 Removes worktrees whose branch is already merged into `origin/main`, whose
 working tree is clean, and which have been **idle for 12 hours**, deletes
 those local branches, and **reports without touching** anything unmerged,
-dirty, locked, detached, or in use. Add `-DryRun` to preview.
+dirty, locked, detached, or in use. Add `--dry-run` to preview.
 
 `git worktree lock <path>` protects a worktree from this script outright. A
-lock outranks every other signal, including `-MinAgeHours 0`.
+lock outranks every other signal, including `--min-age-hours 0`.
 
 **The age guard exists because "finished" and "paused" look identical.** A
 session between edits has a clean tree on a merged branch — exactly like an
@@ -245,9 +245,9 @@ deleting.
 Remote branches are reported, never deleted here — other sessions may be
 pushing to them. `/post-merge-cleanup` deletes the one remote branch it owns.
 
-The script's header comments record three Windows gotchas hit for real
-(long-path `node_modules`, a half-deleted worktree, and a safety check that
-printed nothing on error). Read them before changing the script.
+The script's comments record three gotchas hit for real (a `node_modules`
+too deep for Windows to delete normally, a half-deleted worktree, and a safety
+check that printed nothing on error). Read them before changing the script.
 
 ## 10. Close the step and loop
 

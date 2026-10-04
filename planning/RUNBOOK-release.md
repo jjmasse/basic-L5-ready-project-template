@@ -38,7 +38,7 @@ commit → push to main → GitHub Actions (ci.yml) → green? → {{DEPLOY_PLAT
 <!-- TEMPLATE: list every field in the health response and what a bad value
      means. A bare 200 proves the process answers, not that it is doing its
      job — name the signals that prove the latter, and the order to read them
-     in. The post-merge-cleanup driver's Test-Healthy function should check
+     in. The post-merge-cleanup driver's isHealthy function should check
      the same things. -->
 
 ## Release discipline (what "ready to push" means)

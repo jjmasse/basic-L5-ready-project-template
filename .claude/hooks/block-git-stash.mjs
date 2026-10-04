@@ -40,7 +40,7 @@ const COMMAND_PREFIXES = new Set(['sudo', 'env', 'command', 'time', 'nohup']);
  */
 const READ_ONLY_SUBCOMMANDS = new Set(['list', 'show', '--help', '-h']);
 
-/** The tools this hook inspects. Both are used to drive git in this project. */
+/** The tools this hook inspects: Bash on every platform, and PowerShell, which sessions on Windows also use. */
 const WATCHED_TOOLS = new Set(['Bash', 'PowerShell']);
 
 /**
@@ -53,10 +53,10 @@ const WATCHED_TOOLS = new Set(['Bash', 'PowerShell']);
  *   - unquoted `;`, `|`, `&`, newlines and brackets start a new segment, so
  *     `cd x && git stash pop` is still caught.
  *
- * The escape character differs by shell and it matters here, because this is a
- * Windows project: in PowerShell `\` is an ordinary character, so treating it as
- * an escape would turn `C:\tools\git.exe` into `C:toolsgit.exe` and the program
- * would stop reading as git.
+ * The escape character differs by shell, and both shells reach this hook. In
+ * PowerShell `\` is an ordinary character, so treating it as an escape would
+ * turn `C:\tools\git.exe` into `C:toolsgit.exe` and the program would stop
+ * reading as git.
  *
  * @param {string} command
  * @param {string} escapeChar
